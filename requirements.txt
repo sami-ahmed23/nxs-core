@@ -1,0 +1,23 @@
+# Core orchestration
+langgraph>=0.2.0
+pydantic>=2.0.0
+
+# Agent framework
+crewai
+
+# LLM providers
+langchain-openai>=0.1.0
+langchain-ollama>=0.1.0
+langchain-community>=0.2.0
+
+# Search
+google-search-results>=2.4.2
+
+# Database
+supabase>=2.0.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# Tracing (LangSmith)
+langsmith>=0.1.0
