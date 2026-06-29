@@ -2,16 +2,30 @@ from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
 
-from nxs.schemas.models import PlacementState
+from nxs.agents.scout import run_scout
+from nxs.profile import CANDIDATE_PROFILE
+from nxs.schemas.models import JobListing, PlacementState
 
 
-# Each node receives the full PlacementState and returns a partial update.
-# Logic is implemented per-agent in Issues #4 through #8.
+async def scout_node(state: PlacementState) -> dict:
+    """Issue #4 – Parses raw_html with Ollama to enrich JobListing, loads CandidateProfile."""
+    job = state["job_listing"]
+    parsed = await run_scout(job)
 
+    enriched_job = JobListing(
+        company=parsed.get("company") or job.company,
+        role=parsed.get("role") or job.role,
+        salary=parsed.get("salary") or job.salary,
+        tech_stack=parsed.get("tech_stack") or job.tech_stack,
+        url=job.url,
+        raw_html=job.raw_html,
+    )
 
-def scout_node(state: PlacementState) -> dict:
-    """Issue #4 - Raw data ingestion and parsing."""
-    return {"current_agent": "Scout"}
+    return {
+        "current_agent": "Scout",
+        "job_listing": enriched_job,
+        "candidate_profile": CANDIDATE_PROFILE,
+    }
 
 
 def analyst_node(state: PlacementState) -> dict:
