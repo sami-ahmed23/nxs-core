@@ -65,4 +65,4 @@ def build_graph() -> StateGraph:
     return graph
 
 
-NXS_Archetype = build_graph()
+NXS_Archetype = build_graph().compile()

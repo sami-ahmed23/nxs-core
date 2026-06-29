@@ -49,7 +49,7 @@ class PlacementState(TypedDict):
 
     current_agent: str
     job_listing: JobListing
-    candidate_profile: CandidateProfile
+    candidate_profile: CandidateProfile | None  # loaded by Scout (Issue #4)
     audit_report: AuditReport | None
     market_match_score: int | None
     executive_verdict: Literal["Proceed", "Observe", "Discard"] | None
