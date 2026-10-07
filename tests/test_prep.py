@@ -7,6 +7,7 @@ from nxs.db.listener import on_new_job
 from nxs.graph.archetype import NXS_Archetype, scout_node
 from nxs.logger import log_to_supabase
 from nxs.schemas.models import JobListing
+from nxs.schemas.analysis import AnalystReport, MarketAnalysis, MarketFinding
 
 
 JOB_ID = "72464349-bbe1-4d6d-aefa-e634eddf3011"
@@ -22,6 +23,7 @@ def initial_state():
             raw_html="<p>About the job: Python and SQL. Salary £25,000.</p>",
         ),
         "candidate_profile": None, "audit_report": None,
+        "analyst_report": None,
         "market_match_score": None, "executive_verdict": None,
     }
 
@@ -55,12 +57,20 @@ class PrepTests(unittest.IsolatedAsyncioTestCase):
                 await log_to_supabase(JOB_ID, "Scout", "SCOUTING", "Starting.")
 
     async def test_graph_retains_identity_and_logs_scout(self):
+        unknown = MarketFinding(evidence_status="unknown", summary="No evidence in this test.", citations=[])
+        report = AnalystReport(
+            skill_matches=["Python"], skill_gaps=["SQL"],
+            market=MarketAnalysis(salary_benchmark=unknown, tech_demand=unknown),
+            sources=[], limitations=[],
+        )
         with patch("nxs.graph.archetype.log_to_supabase", new_callable=AsyncMock) as persist:
-            result = await NXS_Archetype.ainvoke(initial_state())
+            with patch("nxs.graph.archetype.run_analyst", new_callable=AsyncMock, return_value=report):
+                result = await NXS_Archetype.ainvoke(initial_state())
         self.assertEqual(result["job_id"], JOB_ID)
         self.assertEqual(result["job_listing"].tech_stack, ["Python", "SQL"])
         self.assertIsNotNone(result["candidate_profile"])
-        self.assertEqual([call.args[2] for call in persist.call_args_list], ["SCOUTING", "SCOUT_COMPLETE"])
+        self.assertEqual(result["analyst_report"], report)
+        self.assertEqual([call.args[2] for call in persist.call_args_list], ["SCOUTING", "SCOUT_COMPLETE", "ANALYSING", "ANALYST_COMPLETE"])
         self.assertTrue(all(call.args[0] == JOB_ID for call in persist.call_args_list))
 
     async def test_scout_failure_logs_error_and_stops(self):

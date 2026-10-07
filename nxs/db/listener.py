@@ -8,6 +8,7 @@ from uuid import UUID
 from dotenv import load_dotenv
 from supabase import AsyncClient, acreate_client
 
+from nxs.agents.analyst import validate_analyst_configuration
 from nxs.graph.archetype import NXS_Archetype
 from nxs.logger import get_logger
 from nxs.schemas.models import JobListing, PlacementState
@@ -38,6 +39,7 @@ async def on_new_job(record: dict) -> None:
             "current_agent": "Scout",
             "job_listing": job,
             "candidate_profile": None,  # loaded inside Scout node (Issue #4)
+            "analyst_report": None,
             "audit_report": None,
             "market_match_score": None,
             "executive_verdict": None,
@@ -53,6 +55,7 @@ async def on_new_job(record: dict) -> None:
 
 async def start_listener() -> None:
     """Polls job_listings every POLL_INTERVAL seconds for new rows."""
+    validate_analyst_configuration()
     url = os.environ["SUPABASE_URL"]
     key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from langgraph.graph import END, StateGraph
 
 from nxs.agents.scout import run_scout
+from nxs.agents.analyst import run_analyst
 from nxs.logger import get_logger, log_to_supabase
 from nxs.profile import CANDIDATE_PROFILE
 from nxs.schemas.models import JobListing, PlacementState
@@ -49,9 +50,23 @@ async def _enrich_listing(state: PlacementState) -> dict:
     }
 
 
-def analyst_node(state: PlacementState) -> dict:
-    """Issue #5 - SerperTool market cross-referencing."""
-    return {"current_agent": "Analyst"}
+async def analyst_node(state: PlacementState) -> dict:
+    """Issue #5: match candidate skills and research source-backed market evidence."""
+    job_id = state["job_id"]
+    await log_to_supabase(job_id, "Analyst", "ANALYSING", "Comparing candidate skills and researching UK market evidence.")
+    try:
+        profile = state.get("candidate_profile")
+        if profile is None:
+            raise ValueError("Analyst requires a candidate profile from Scout")
+        report = await run_analyst(job_id, state["job_listing"], profile)
+        await log_to_supabase(job_id, "Analyst", "ANALYST_COMPLETE", report.model_dump_json())
+        return {"current_agent": "Analyst", "analyst_report": report}
+    except Exception:
+        try:
+            await log_to_supabase(job_id, "Analyst", "ERROR", "Analyst failed. Check API configuration, service availability and output validation; no analysis was accepted.")
+        except Exception:
+            get_logger("Analyst").error("Could not persist Analyst failure log")
+        raise
 
 
 def auditor_node(state: PlacementState) -> dict:

@@ -152,6 +152,7 @@ activemq-data/
 .envrc
 .venv/
 .python-runtime/
+.crewai/
 env/
 venv/
 ENV/

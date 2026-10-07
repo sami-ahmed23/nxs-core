@@ -1,23 +1,15 @@
 # Core orchestration
-langgraph>=0.2.0
-pydantic>=2.0.0
+langgraph==1.2.14
+pydantic==2.12.5
 
 # Agent framework
-crewai
+crewai==1.15.23
+crewai-tools==1.15.23
 
-# LLM providers
-langchain-openai>=0.1.0
-langchain-ollama>=0.1.0
-langchain-community>=0.2.0
-
-# Search
-google-search-results>=2.4.2
+# Hosted inference and Serper search are provided through CrewAI and crewai-tools.
 
 # Database
-supabase>=2.0.0
+supabase==2.32.0
 
 # Environment
-python-dotenv>=1.0.0
-
-# Tracing (LangSmith)
-langsmith>=0.1.0
+python-dotenv==1.2.4
