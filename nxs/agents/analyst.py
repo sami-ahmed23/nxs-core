@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from nxs.logger import log_to_supabase
+from nxs.agents.market import collect_public_market
 from nxs.schemas.analysis import AnalystReport, Citation, MarketAnalysis, MarketFinding, SearchSource
 from nxs.schemas.models import CandidateProfile, JobListing
 
@@ -72,10 +73,17 @@ def _match_skills(job: JobListing, profile: CandidateProfile) -> tuple[list[str]
 
 
 async def run_analyst(job_id: str, job: JobListing, profile: CandidateProfile) -> AnalystReport:
-    """Compare skills locally; optionally retrieve search evidence without model calls."""
+    """Compare skills and retrieve public market evidence without model calls."""
     validate_analyst_configuration()
 
     matches, gaps = _match_skills(job, profile)
+    if os.environ.get("NXS_MARKET_SEARCH", "public").strip().lower() == "public":
+        await log_to_supabase(job_id, "Analyst", "ANALYSING", "Reading free public UK role salary and technology vacancy tables.")
+        market, sources, limitations = await asyncio.to_thread(collect_public_market, job)
+        limitations.append("Skill gaps compare extracted mentions with the configured profile, not verified mandatory requirements.")
+        if not job.tech_stack:
+            limitations.append("Scout extracted no technologies; technology demand and skill alignment cannot be established.")
+        return AnalystReport(skill_matches=matches, skill_gaps=gaps, market=market, sources=sources, limitations=limitations)
     year = datetime.now(timezone.utc).year
     queries = {
         "salary": f"UK {job.role[:150]} placement internship salary benchmark {year}",
@@ -131,10 +139,10 @@ async def run_analyst(job_id: str, job: JobListing, profile: CandidateProfile) -
 
 
 def validate_analyst_configuration() -> None:
-    """Local mode needs no API key; search is an explicit optional choice."""
+    """Public and offline modes need no keys; Serper is an optional legacy mode."""
     load_dotenv()
-    mode = os.environ.get("NXS_MARKET_SEARCH", "off").strip().lower()
-    if mode not in {"off", "serper"}:
-        raise ValueError("NXS_MARKET_SEARCH must be off or serper")
+    mode = os.environ.get("NXS_MARKET_SEARCH", "public").strip().lower()
+    if mode not in {"public", "off", "serper"}:
+        raise ValueError("NXS_MARKET_SEARCH must be public, off or serper")
     if mode == "serper" and not os.environ.get("SERPER_API_KEY", "").strip():
         raise ValueError("Configure SERPER_API_KEY or set NXS_MARKET_SEARCH=off")

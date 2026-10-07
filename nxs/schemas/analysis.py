@@ -1,4 +1,4 @@
-"""Evidence contracts for Issue #5. Sources are search snippets, not verified pages."""
+"""Evidence contracts for Issue #5: source snippets or public statistical tables."""
 
 from __future__ import annotations
 

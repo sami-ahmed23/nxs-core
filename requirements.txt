@@ -4,6 +4,7 @@ pydantic==2.12.5
 
 # Optional Serper search (no hosted model)
 requests==2.34.2
+beautifulsoup4==4.15.0
 
 # Database
 supabase==2.32.0
