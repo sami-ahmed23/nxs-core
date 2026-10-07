@@ -4,6 +4,7 @@ from langgraph.graph import END, StateGraph
 
 from nxs.agents.scout import run_scout
 from nxs.agents.analyst import run_analyst
+from nxs.agents.auditor import run_auditor, MAX_AUDIT_RETRIES
 from nxs.logger import get_logger, log_to_supabase
 from nxs.profile import CANDIDATE_PROFILE
 from nxs.schemas.models import JobListing, PlacementState
@@ -69,9 +70,27 @@ async def analyst_node(state: PlacementState) -> dict:
         raise
 
 
-def auditor_node(state: PlacementState) -> dict:
-    """Issue #6 - Red flag detection and retry logic."""
-    return {"current_agent": "Auditor"}
+async def auditor_node(state: PlacementState) -> dict:
+    """Audit captured evidence and log a bounded routing decision."""
+    job_id = state["job_id"]
+    await log_to_supabase(job_id, "Auditor", "AUDITING", "Checking captured listing quality and Analyst consistency.")
+    try:
+        report = run_auditor(state)
+        if report.evidence:
+            await log_to_supabase(job_id, "Auditor", "RED_FLAG_DETECTED", report.model_dump_json())
+        count = state.get("audit_retry_count", 0)
+        if report.decision == "retry":
+            count += 1
+            await log_to_supabase(job_id, "Auditor", "RETRY_TRIGGERED", report.model_dump_json())
+        elif report.decision == "pass":
+            await log_to_supabase(job_id, "Auditor", "AUDIT_PASSED", report.model_dump_json())
+        return {"current_agent": "Auditor", "audit_report": report, "audit_retry_count": count}
+    except Exception:
+        try:
+            await log_to_supabase(job_id, "Auditor", "ERROR", "Audit failed; processing stopped without accepting the listing.")
+        except Exception:
+            get_logger("Auditor").error("Could not persist Auditor failure log")
+        raise
 
 
 def assessor_node(state: PlacementState) -> dict:
@@ -85,9 +104,15 @@ def executive_node(state: PlacementState) -> dict:
 
 
 def route_after_auditor(state: PlacementState) -> str:
-    """Conditional edge: retry back to Scout if AuditReport flags it, else proceed."""
+    """Stop rejected audits, reparse incomplete inputs once, or proceed."""
     audit = state.get("audit_report")
-    if audit and audit.retry_required:
+    if audit is None:
+        raise ValueError("Auditor must produce a report before routing")
+    if audit.decision == "reject":
+        return END
+    if audit.retry_required:
+        if state.get("audit_retry_count", 0) > MAX_AUDIT_RETRIES:
+            raise ValueError("Audit retry budget exceeded")
         return "Scout"
     return "Assessor"
 
@@ -107,7 +132,7 @@ def build_graph() -> StateGraph:
     graph.add_conditional_edges(
         "Auditor",
         route_after_auditor,
-        {"Scout": "Scout", "Assessor": "Assessor"},
+        {"Scout": "Scout", "Assessor": "Assessor", END: END},
     )
     graph.add_edge("Assessor", "Executive")
     graph.add_edge("Executive", END)

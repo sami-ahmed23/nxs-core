@@ -41,6 +41,7 @@ async def on_new_job(record: dict) -> None:
             "candidate_profile": None,  # loaded inside Scout node (Issue #4)
             "analyst_report": None,
             "audit_report": None,
+            "audit_retry_count": 0,
             "market_match_score": None,
             "executive_verdict": None,
         }

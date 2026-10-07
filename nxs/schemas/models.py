@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from nxs.schemas.analysis import AnalystReport
 
@@ -34,13 +34,32 @@ class CandidateProfile(BaseModel):
         return self.model_dump()
 
 
+class AuditEvidence(BaseModel):
+    code: str
+    severity: Literal["warning", "blocking"]
+    field: str
+    detail: str
+
+
 class AuditReport(BaseModel):
     """Output of the Auditor agent. Determines whether the pipeline retries or proceeds."""
 
     red_flags: list[str]
     retry_required: bool
-    confidence_score: float  # 0.0 (low confidence) to 1.0 (high confidence)
+    confidence_score: float = Field(ge=0, le=1)
     notes: str | None = None
+    decision: Literal["pass", "retry", "reject"]
+    evidence: list[AuditEvidence]
+
+    @model_validator(mode="after")
+    def consistent_decision(self):
+        if self.retry_required != (self.decision == "retry"):
+            raise ValueError("retry_required must agree with the audit decision")
+        if self.decision == "pass" and any(item.severity == "blocking" for item in self.evidence):
+            raise ValueError("A blocking finding cannot pass audit")
+        if self.decision != "pass" and not any(item.severity == "blocking" for item in self.evidence):
+            raise ValueError("Retry or rejection requires blocking evidence")
+        return self
 
     def to_supabase(self) -> dict:
         return self.model_dump()
@@ -55,5 +74,6 @@ class PlacementState(TypedDict):
     candidate_profile: CandidateProfile | None  # loaded by Scout (Issue #4)
     analyst_report: AnalystReport | None
     audit_report: AuditReport | None
+    audit_retry_count: int
     market_match_score: int | None
     executive_verdict: Literal["Proceed", "Observe", "Discard"] | None

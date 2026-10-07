@@ -24,6 +24,7 @@ def initial_state():
         ),
         "candidate_profile": None, "audit_report": None,
         "analyst_report": None,
+        "audit_retry_count": 0,
         "market_match_score": None, "executive_verdict": None,
     }
 
@@ -70,7 +71,7 @@ class PrepTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["job_listing"].tech_stack, ["Python", "SQL"])
         self.assertIsNotNone(result["candidate_profile"])
         self.assertEqual(result["analyst_report"], report)
-        self.assertEqual([call.args[2] for call in persist.call_args_list], ["SCOUTING", "SCOUT_COMPLETE", "ANALYSING", "ANALYST_COMPLETE"])
+        self.assertEqual([call.args[2] for call in persist.call_args_list], ["SCOUTING", "SCOUT_COMPLETE", "ANALYSING", "ANALYST_COMPLETE", "AUDITING", "RED_FLAG_DETECTED", "AUDIT_PASSED"])
         self.assertTrue(all(call.args[0] == JOB_ID for call in persist.call_args_list))
 
     async def test_scout_failure_logs_error_and_stops(self):
