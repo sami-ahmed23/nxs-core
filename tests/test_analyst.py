@@ -1,7 +1,6 @@
 import os
 import unittest
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from pydantic import ValidationError
@@ -78,7 +77,7 @@ class EvidenceTests(unittest.TestCase):
 
 class AnalystTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.env = patch.dict(os.environ, {"OPENAI_API_KEY": "test-only", "SERPER_API_KEY": "test-only"})
+        self.env = patch.dict(os.environ, {"NXS_MARKET_SEARCH": "serper", "SERPER_API_KEY": "test-only"})
         self.env.start()
         self.addCleanup(self.env.stop)
         self.logging = patch("nxs.agents.analyst.log_to_supabase", new_callable=AsyncMock)
@@ -139,9 +138,9 @@ class AnalystTests(unittest.IsolatedAsyncioTestCase):
                     await start_listener()
         connect.assert_not_called()
 
-    async def test_invalid_model_output_stops_graph_before_auditor(self):
+    async def test_invalid_analysis_stops_graph_before_auditor(self):
         with patch("nxs.graph.archetype.log_to_supabase", new_callable=AsyncMock) as persist:
-            with patch("nxs.graph.archetype.run_analyst", new_callable=AsyncMock, side_effect=ValueError("Invalid model output")):
+            with patch("nxs.graph.archetype.run_analyst", new_callable=AsyncMock, side_effect=ValueError("Invalid analysis output")):
                 with self.assertRaises(ValueError):
                     await NXS_Archetype.ainvoke(initial_state())
         statuses = [call.args[2] for call in persist.call_args_list]
@@ -155,7 +154,7 @@ class AnalystTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ProviderAdapterTests(unittest.TestCase):
-    """Use the installed SDKs, mocking only the network/model boundary."""
+    """Mock only the optional search HTTP boundary."""
 
     def test_real_serper_tool_processes_response_and_uses_uk_locale(self):
         response = Mock()
@@ -167,34 +166,38 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual(request.call_args.kwargs["json"]["gl"], "gb")
         self.assertEqual(request.call_args.kwargs["timeout"], 10)
 
-    def test_crewai_rejects_unvalidated_output(self):
-        from nxs.agents.analyst import _configure_crewai
-        _configure_crewai()
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-only"}):
-            with patch("crewai.Crew.kickoff", return_value=SimpleNamespace(pydantic=None)):
-                with self.assertRaisesRegex(ValueError, "validated"):
-                    _summarise(initial_state()["job_listing"], [source()])
+    def test_deterministic_summary_does_not_invent_market_trends(self):
+        evidence = source().model_copy(update={"topic": "demand", "source_id": "demand-1", "snippet": "UK Python placements are advertised."})
+        job = initial_state()["job_listing"].model_copy(update={"tech_stack": ["Python"]})
+        result = _summarise(job, [evidence])
+        self.assertEqual(result.salary_benchmark.evidence_status, "unknown")
+        self.assertEqual(result.tech_demand.evidence_status, "supported")
+        self.assertIn("mentions only", result.tech_demand.summary)
+        self.assertEqual(result.tech_demand.citations[0].quote, evidence.snippet)
 
-    def test_crewai_accepts_validated_output(self):
-        from nxs.agents.analyst import _configure_crewai
-        _configure_crewai()
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-only"}):
-            with patch("crewai.Crew.kickoff", return_value=SimpleNamespace(pydantic=market())) as kickoff:
-                result = _summarise(initial_state()["job_listing"], [source()])
-        kickoff.assert_called_once()
+    def test_unrelated_search_results_do_not_support_demand(self):
+        result = _summarise(initial_state()["job_listing"], [source()])
         self.assertEqual(result.tech_demand.evidence_status, "unknown")
 
-    def test_real_crew_parses_model_response_into_contract(self):
-        from nxs.agents.analyst import _configure_crewai
-        _configure_crewai()
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-only"}):
-            with patch(
-                "crewai.llms.providers.openai.completion.OpenAICompletion.call",
-                return_value="Final Answer: " + supported_market().model_dump_json(),
-            ) as model_call:
-                result = _summarise(initial_state()["job_listing"], [source()])
-        self.assertGreaterEqual(model_call.call_count, 1)
-        self.assertEqual(result.salary_benchmark.citations[0].source_id, "salary-1")
+
+class LocalModeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_local_mode_needs_no_keys_and_never_calls_external_search(self):
+        with patch.dict(os.environ, {"NXS_MARKET_SEARCH": "off", "OPENAI_API_KEY": "", "SERPER_API_KEY": ""}):
+            with patch("nxs.agents.analyst._search") as search:
+                with patch("nxs.agents.analyst.log_to_supabase", new_callable=AsyncMock):
+                    job = initial_state()["job_listing"].model_copy(update={"tech_stack": ["Python", "SQL"]})
+                    report = await run_analyst(JOB_ID, job, CANDIDATE_PROFILE)
+        search.assert_not_called()
+        self.assertEqual(report.skill_matches, ["Python"])
+        self.assertEqual(report.skill_gaps, ["SQL"])
+        self.assertEqual(report.sources, [])
+        self.assertEqual(report.market.salary_benchmark.evidence_status, "unknown")
+        self.assertEqual(report.market.tech_demand.evidence_status, "unknown")
+
+    async def test_typo_in_mode_is_rejected(self):
+        with patch.dict(os.environ, {"NXS_MARKET_SEARCH": "serpr"}):
+            with self.assertRaisesRegex(ValueError, "off or serper"):
+                await run_analyst(JOB_ID, initial_state()["job_listing"], CANDIDATE_PROFILE)
 
 
 if __name__ == "__main__":

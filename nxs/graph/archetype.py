@@ -63,7 +63,7 @@ async def analyst_node(state: PlacementState) -> dict:
         return {"current_agent": "Analyst", "analyst_report": report}
     except Exception:
         try:
-            await log_to_supabase(job_id, "Analyst", "ERROR", "Analyst failed. Check API configuration, service availability and output validation; no analysis was accepted.")
+            await log_to_supabase(job_id, "Analyst", "ERROR", "Analyst failed. Check search configuration, service availability and output validation; no analysis was accepted.")
         except Exception:
             get_logger("Analyst").error("Could not persist Analyst failure log")
         raise

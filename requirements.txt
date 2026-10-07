@@ -2,11 +2,8 @@
 langgraph==1.2.14
 pydantic==2.12.5
 
-# Agent framework
-crewai==1.15.23
-crewai-tools==1.15.23
-
-# Hosted inference and Serper search are provided through CrewAI and crewai-tools.
+# Optional Serper search (no hosted model)
+requests==2.34.2
 
 # Database
 supabase==2.32.0
