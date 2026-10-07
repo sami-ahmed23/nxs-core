@@ -3,12 +3,33 @@ from __future__ import annotations
 from langgraph.graph import END, StateGraph
 
 from nxs.agents.scout import run_scout
+from nxs.logger import get_logger, log_to_supabase
 from nxs.profile import CANDIDATE_PROFILE
 from nxs.schemas.models import JobListing, PlacementState
 
 
 async def scout_node(state: PlacementState) -> dict:
-    """Issue #4 – Parses raw_html with Ollama to enrich JobListing, loads CandidateProfile."""
+    """Extract listing fields, load the candidate profile and persist Scout logs."""
+    job_id = state["job_id"]
+    await log_to_supabase(job_id, "Scout", "SCOUTING", "Extracting listing fields from captured HTML.")
+    try:
+        update = await _enrich_listing(state)
+        job = update["job_listing"]
+        await log_to_supabase(
+            job_id, "Scout", "SCOUT_COMPLETE",
+            f"Extracted technologies: {', '.join(job.tech_stack) or 'none identified'}. "
+            f"Salary: {job.salary or 'unknown'}. Candidate profile loaded.",
+        )
+        return update
+    except Exception:
+        try:
+            await log_to_supabase(job_id, "Scout", "ERROR", "Scout could not complete extraction or persist its result log.")
+        except Exception:
+            get_logger("Scout").error("Could not persist Scout failure log")
+        raise
+
+
+async def _enrich_listing(state: PlacementState) -> dict:
     job = state["job_listing"]
     parsed = await run_scout(job)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import datetime, timezone
+from uuid import UUID
 
 from dotenv import load_dotenv
 from supabase import AsyncClient, acreate_client
@@ -33,6 +34,7 @@ async def on_new_job(record: dict) -> None:
         )
 
         initial_state: PlacementState = {
+            "job_id": str(UUID(record["id"])),
             "current_agent": "Scout",
             "job_listing": job,
             "candidate_profile": None,  # loaded inside Scout node (Issue #4)

@@ -47,6 +47,7 @@ class AuditReport(BaseModel):
 class PlacementState(TypedDict):
     """LangGraph state machine schema. Passed between all agent nodes."""
 
+    job_id: str
     current_agent: str
     job_listing: JobListing
     candidate_profile: CandidateProfile | None  # loaded by Scout (Issue #4)

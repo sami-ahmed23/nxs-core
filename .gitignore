@@ -150,7 +150,8 @@ activemq-data/
 # Environments
 .env
 .envrc
-.venv
+.venv/
+.python-runtime/
 env/
 venv/
 ENV/
