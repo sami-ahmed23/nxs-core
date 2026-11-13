@@ -179,9 +179,25 @@ class SeniorityExtractionTests(unittest.TestCase):
         # A listing naming two levels is pitched at the harder one.
         self.assertEqual(_extract_seniority("Graduate or Senior Engineer"), "senior")
 
+    def test_title_decides_over_colleagues_named_in_the_description(self):
+        # Regression: a live JPMorganChase internship was read as senior and discarded.
+        description = ("You will work alongside senior data scientists and lead researchers, "
+                       "presenting to principal engineers and senior management.")
+        self.assertEqual(_extract_seniority(
+            "2027 Machine Learning Center of Excellence (NLP) - Internship", description), "intern")
+
+    def test_description_cannot_raise_a_silent_title_to_senior(self):
+        self.assertIsNone(_extract_seniority(
+            "Machine Learning Engineer", "Report to a senior engineering lead."))
+
+    def test_description_programme_wording_counts_when_the_title_is_silent(self):
+        self.assertEqual(_extract_seniority(
+            "Technology Analyst", "A 12-month industrial placement starting September 2027."),
+            "placement")
+
     def test_years_of_experience_imply_a_level(self):
-        self.assertEqual(_extract_seniority("5 years experience required"), "senior")
-        self.assertEqual(_extract_seniority("2 years of commercial experience"), "mid")
+        self.assertEqual(_extract_seniority("Engineer", "5 years experience required"), "senior")
+        self.assertEqual(_extract_seniority("Engineer", "2 years of commercial experience"), "mid")
 
     def test_silence_and_partial_words_return_none(self):
         for text in ["Build services using Python", "Our internal tooling team", ""]:

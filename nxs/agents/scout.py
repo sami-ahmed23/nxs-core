@@ -76,15 +76,32 @@ def _level_from_years(text: str) -> str | None:
     return "mid" if years <= 4 else "senior"
 
 
-def _extract_seniority(text: str) -> str | None:
-    """Return the most senior level the listing states, or None when it states none."""
-    found = [level for level, pattern in _SENIORITY_PATTERNS if re.search(pattern, text, re.IGNORECASE)]
-    years_level = _level_from_years(text)
-    if years_level:
-        found.append(years_level)
+# Descriptions name colleagues ("work alongside senior engineers"), so only programme
+# wording is trusted there. Senior, lead and principal count only in the role title.
+_DESCRIPTION_LEVELS = {"intern", "placement", "graduate"}
+
+
+def _levels_in(text: str, allowed: set[str] | None = None) -> list[str]:
+    return [level for level, pattern in _SENIORITY_PATTERNS
+            if (allowed is None or level in allowed) and re.search(pattern, text, re.IGNORECASE)]
+
+
+def _extract_seniority(title: str, description: str = "") -> str | None:
+    """Return the level the listing is pitched at, or None when it does not say.
+
+    The role title is authoritative. The description is consulted only when the title is
+    silent, and then only for programme wording and a stated minimum of years. A missed
+    level lowers the score ceiling; a wrong one would force a Discard, so missing is safer.
+    """
+    found = _levels_in(title)
+    if not found:
+        found = _levels_in(description, _DESCRIPTION_LEVELS)
+        years_level = _level_from_years(f"{title} {description}")
+        if years_level:
+            found.append(years_level)
     if not found:
         return None
-    # The highest stated level sets the bar a candidate has to meet.
+    # Within the trusted text, the highest stated level sets the bar a candidate must meet.
     return max(found, key=SENIORITY_LADDER.index)
 
 
@@ -116,8 +133,7 @@ async def run_scout(job: JobListing) -> dict:
 
     tech_stack = _extract_tech_stack(plain)
     salary = _extract_salary(plain)
-    # The role title carries the level as often as the description does.
-    seniority = _extract_seniority(f"{job.role} {plain}")
+    seniority = _extract_seniority(job.role, plain)
 
     log.info(f"Scout extracted – tech_stack: {tech_stack}, salary: {salary}, seniority: {seniority}")
 

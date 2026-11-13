@@ -100,7 +100,7 @@ async def auditor_node(state: PlacementState) -> dict:
 async def assessor_node(state: PlacementState) -> dict:
     """Score the passed audit and persist the Nexus Score with its evidence ceiling."""
     job_id = state["job_id"]
-    await log_to_supabase(job_id, "Assessor", "SCORING", "Weighting skill coverage, audit integrity and salary alignment.")
+    await log_to_supabase(job_id, "Assessor", "SCORING", "Weighting skill coverage, audit integrity, seniority fit and salary alignment.")
     try:
         report = run_assessor(state)
         await log_to_supabase(job_id, "Assessor", "SCORE_COMPLETE", report.model_dump_json())
