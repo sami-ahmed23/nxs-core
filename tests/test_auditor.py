@@ -18,7 +18,7 @@ def initial_state():
         "job_listing": JobListing(company="Example", role="Developer",
                                   tech_stack=[], url="https://example.com/job", raw_html=""),
         "candidate_profile": None, "analyst_report": None, "audit_report": None,
-        "market_match_score": None, "executive_verdict": None,
+        "assessment_report": None, "nexus_score": None, "executive_verdict": None,
     }
 
 
@@ -142,7 +142,7 @@ class AuditorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["current_agent"], "Auditor")
         self.assertEqual(result["audit_report"].decision, "reject")
         self.assertIsNone(result["executive_verdict"])
-        self.assertIsNone(result["market_match_score"])
+        self.assertIsNone(result["nexus_score"])
         statuses = [call.args[2] for call in persist.call_args_list]
         self.assertEqual(statuses.count("SCOUTING"), 2)
         self.assertEqual(statuses.count("RETRY_TRIGGERED"), 1)

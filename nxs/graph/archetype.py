@@ -5,6 +5,7 @@ from langgraph.graph import END, StateGraph
 from nxs.agents.scout import run_scout
 from nxs.agents.analyst import run_analyst
 from nxs.agents.auditor import run_auditor, MAX_AUDIT_RETRIES
+from nxs.agents.assessor import run_assessor
 from nxs.logger import get_logger, log_to_supabase
 from nxs.profile import CANDIDATE_PROFILE
 from nxs.schemas.models import JobListing, PlacementState
@@ -93,9 +94,21 @@ async def auditor_node(state: PlacementState) -> dict:
         raise
 
 
-def assessor_node(state: PlacementState) -> dict:
-    """Issue #7 - Mathematical fit scoring (1-100)."""
-    return {"current_agent": "Assessor"}
+async def assessor_node(state: PlacementState) -> dict:
+    """Score the passed audit and persist the Nexus Score with its evidence ceiling."""
+    job_id = state["job_id"]
+    await log_to_supabase(job_id, "Assessor", "SCORING", "Weighting skill coverage, audit integrity and salary alignment.")
+    try:
+        report = run_assessor(state)
+        await log_to_supabase(job_id, "Assessor", "SCORE_COMPLETE", report.model_dump_json())
+        return {"current_agent": "Assessor", "assessment_report": report,
+                "nexus_score": report.nexus_score}
+    except Exception:
+        try:
+            await log_to_supabase(job_id, "Assessor", "ERROR", "Scoring failed; no Nexus Score was accepted for this listing.")
+        except Exception:
+            get_logger("Assessor").error("Could not persist Assessor failure log")
+        raise
 
 
 def executive_node(state: PlacementState) -> dict:

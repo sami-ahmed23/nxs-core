@@ -42,7 +42,8 @@ async def on_new_job(record: dict) -> None:
             "analyst_report": None,
             "audit_report": None,
             "audit_retry_count": 0,
-            "market_match_score": None,
+            "assessment_report": None,
+            "nexus_score": None,
             "executive_verdict": None,
         }
 

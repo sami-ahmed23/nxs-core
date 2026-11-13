@@ -5,6 +5,7 @@ from typing import Literal, TypedDict
 from pydantic import BaseModel, Field, model_validator
 
 from nxs.schemas.analysis import AnalystReport
+from nxs.schemas.assessment import AssessmentReport
 
 
 class JobListing(BaseModel):
@@ -75,5 +76,6 @@ class PlacementState(TypedDict):
     analyst_report: AnalystReport | None
     audit_report: AuditReport | None
     audit_retry_count: int
-    market_match_score: int | None
+    assessment_report: AssessmentReport | None
+    nexus_score: int | None  # 300-850, set by Assessor (Issue #7)
     executive_verdict: Literal["Proceed", "Observe", "Discard"] | None
