@@ -44,6 +44,7 @@ async def on_new_job(record: dict) -> None:
             "audit_retry_count": 0,
             "assessment_report": None,
             "nexus_score": None,
+            "executive_report": None,
             "executive_verdict": None,
         }
 

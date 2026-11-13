@@ -26,7 +26,7 @@ def initial_state(html=DESCRIPTION, salary=None, tech_stack=("Python", "TypeScri
                                   seniority=seniority,
                                   url="https://example.com/job", raw_html=html),
         "candidate_profile": None, "analyst_report": None, "audit_report": None,
-        "assessment_report": None, "nexus_score": None, "executive_verdict": None,
+        "assessment_report": None, "nexus_score": None, "executive_report": None, "executive_verdict": None,
     }
 
 

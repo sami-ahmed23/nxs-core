@@ -6,6 +6,7 @@ from nxs.agents.scout import run_scout
 from nxs.agents.analyst import run_analyst
 from nxs.agents.auditor import run_auditor, MAX_AUDIT_RETRIES
 from nxs.agents.assessor import run_assessor
+from nxs.agents.executive import run_executive
 from nxs.logger import get_logger, log_to_supabase
 from nxs.profile import CANDIDATE_PROFILE
 from nxs.schemas.models import JobListing, PlacementState
@@ -113,9 +114,29 @@ async def assessor_node(state: PlacementState) -> dict:
         raise
 
 
-def executive_node(state: PlacementState) -> dict:
-    """Issue #8 - Clinical verdict synthesis."""
-    return {"current_agent": "Executive"}
+async def persist_result(job_id: str, report) -> None:
+    """Write the verdict back. Imported lazily: nxs.db imports this module via the listener."""
+    from nxs.db.results import persist_result as _persist
+
+    await _persist(job_id, report)
+
+
+async def executive_node(state: PlacementState) -> dict:
+    """Synthesise the verdict, persist it to job_listings and log the outcome."""
+    job_id = state["job_id"]
+    await log_to_supabase(job_id, "Executive", "VERDICT_PENDING", "Synthesising agent output into a verdict.")
+    try:
+        report = run_executive(state)
+        await persist_result(job_id, report)
+        await log_to_supabase(job_id, "Executive", report.verdict.upper(), report.model_dump_json())
+        return {"current_agent": "Executive", "executive_report": report,
+                "executive_verdict": report.verdict}
+    except Exception:
+        try:
+            await log_to_supabase(job_id, "Executive", "ERROR", "Verdict synthesis or write-back failed; no verdict was recorded.")
+        except Exception:
+            get_logger("Executive").error("Could not persist Executive failure log")
+        raise
 
 
 def route_after_auditor(state: PlacementState) -> str:
