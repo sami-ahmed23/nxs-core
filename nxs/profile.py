@@ -19,6 +19,7 @@ CANDIDATE_PROFILE = CandidateProfile(
         "Vercel",
     ],
     experience_level="Undergraduate Year 2 – placement year candidate, AI/ML focus",
+    seniority_target=["intern", "placement", "graduate"],
     target_salary="£20,000–£28,000",
     geo_preferences=["London", "Surrey", "Remote", "Hybrid – South East England"],
 )

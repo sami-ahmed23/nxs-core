@@ -44,6 +44,50 @@ def _extract_tech_stack(text: str) -> list[str]:
     return found
 
 
+# Ladder from most junior to most senior. Extraction reports the highest level stated.
+SENIORITY_LADDER: list[str] = [
+    "intern", "placement", "graduate", "junior", "mid", "senior", "lead", "principal",
+]
+
+# Wording that identifies a level. Written to avoid partial hits such as "internal".
+_SENIORITY_PATTERNS: list[tuple[str, str]] = [
+    ("intern", r"\b(?:intern|internship|summer intern)\b"),
+    ("placement", r"\b(?:placement|industrial placement|year in industry|sandwich (?:year|placement))\b"),
+    ("graduate", r"\b(?:graduate (?:scheme|programme|role|developer|engineer|analyst)|new grad|entry[- ]level)\b"),
+    ("junior", r"\b(?:junior|associate)\b"),
+    ("mid", r"\b(?:mid[- ]level|intermediate)\b"),
+    ("senior", r"\bsenior\b"),
+    ("lead", r"\b(?:lead|staff)\b"),
+    ("principal", r"\b(?:principal|head of|director)\b"),
+]
+
+# A stated minimum of years is a seniority signal in its own right.
+_YEARS_RE = re.compile(r"(\d{1,2})\s*\+?\s*(?:-|–|to)?\s*\d{0,2}\s*years?[^.]{0,30}?experience", re.IGNORECASE)
+
+
+def _level_from_years(text: str) -> str | None:
+    """Map a stated minimum number of years to the lowest level that could satisfy it."""
+    matches = [int(match.group(1)) for match in _YEARS_RE.finditer(text)]
+    if not matches:
+        return None
+    years = min(matches)  # The lowest stated minimum is the easiest bar to clear.
+    if years <= 1:
+        return "junior"
+    return "mid" if years <= 4 else "senior"
+
+
+def _extract_seniority(text: str) -> str | None:
+    """Return the most senior level the listing states, or None when it states none."""
+    found = [level for level, pattern in _SENIORITY_PATTERNS if re.search(pattern, text, re.IGNORECASE)]
+    years_level = _level_from_years(text)
+    if years_level:
+        found.append(years_level)
+    if not found:
+        return None
+    # The highest stated level sets the bar a candidate has to meet.
+    return max(found, key=SENIORITY_LADDER.index)
+
+
 def _extract_salary(text: str) -> str | None:
     """Regex scan for salary/compensation figures."""
     match = _SALARY_RE.search(text)
@@ -72,12 +116,15 @@ async def run_scout(job: JobListing) -> dict:
 
     tech_stack = _extract_tech_stack(plain)
     salary = _extract_salary(plain)
+    # The role title carries the level as often as the description does.
+    seniority = _extract_seniority(f"{job.role} {plain}")
 
-    log.info(f"Scout extracted – tech_stack: {tech_stack}, salary: {salary}")
+    log.info(f"Scout extracted – tech_stack: {tech_stack}, salary: {salary}, seniority: {seniority}")
 
     return {
         "company": job.company,
         "role": job.role,
         "tech_stack": tech_stack,
         "salary": salary,
+        "seniority": seniority,
     }

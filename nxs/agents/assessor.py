@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from nxs.agents.scout import SENIORITY_LADDER
 from nxs.schemas.assessment import (
     COMPONENT_WEIGHTS, SCORE_FLOOR, SCORE_SPAN, AssessmentReport, ScoreComponent,
 )
@@ -84,6 +85,36 @@ def run_assessor(state: PlacementState) -> AssessmentReport:
         detail=f"Input completeness {audit.confidence_score:.2f}"
                + (f"; warnings: {', '.join(warnings)}." if warnings else "; no warnings."),
     ))
+
+    # Seniority fit: a level the candidate cannot reach must not be offset by skill overlap.
+    weight = COMPONENT_WEIGHTS["seniority_fit"]
+    listed_level, targets = job.seniority, profile.seniority_target
+    if listed_level is None or listed_level not in SENIORITY_LADDER or not targets:
+        reason = ("The listing states no seniority level."
+                  if listed_level is None else "The stated level is outside the known ladder.")
+        components.append(ScoreComponent(
+            name="seniority_fit", evidence_status="unknown", awarded=0,
+            available=weight, detail=reason,
+        ))
+        limitations.append("Seniority fit is unscored: " + reason)
+    else:
+        known = [level for level in targets if level in SENIORITY_LADDER]
+        if not known:
+            raise ValueError("The candidate profile lists no recognised seniority target")
+        # Distance is measured upward only. A level below the target is still reachable.
+        distance = min(max(SENIORITY_LADDER.index(listed_level) - SENIORITY_LADDER.index(level), 0)
+                       for level in known)
+        awarded = max(weight - distance * (weight // 2), 0)
+        components.append(ScoreComponent(
+            name="seniority_fit", evidence_status="supported", awarded=awarded, available=weight,
+            detail=f"Listing states {listed_level} against a target of {', '.join(known)}; "
+                   f"{distance} level(s) above reach.",
+        ))
+        if awarded == 0:
+            limitations.append(
+                f"The listing is pitched at {listed_level}, beyond the stated target, so "
+                "skill overlap does not offset it."
+            )
 
     # Salary alignment: the listing's own figure against the candidate's target.
     weight = COMPONENT_WEIGHTS["salary_alignment"]

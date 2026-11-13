@@ -21,7 +21,8 @@ async def scout_node(state: PlacementState) -> dict:
         await log_to_supabase(
             job_id, "Scout", "SCOUT_COMPLETE",
             f"Extracted technologies: {', '.join(job.tech_stack) or 'none identified'}. "
-            f"Salary: {job.salary or 'unknown'}. Candidate profile loaded.",
+            f"Salary: {job.salary or 'unknown'}. Seniority: {job.seniority or 'unstated'}. "
+            "Candidate profile loaded.",
         )
         return update
     except Exception:
@@ -41,6 +42,7 @@ async def _enrich_listing(state: PlacementState) -> dict:
         role=parsed.get("role") or job.role,
         salary=parsed.get("salary") or job.salary,
         tech_stack=parsed.get("tech_stack") or job.tech_stack,
+        seniority=parsed.get("seniority") or job.seniority,
         url=job.url,
         raw_html=job.raw_html,
     )

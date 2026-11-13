@@ -14,16 +14,17 @@ SCORE_SPAN = SCORE_CEILING - SCORE_FLOOR
 
 # Points available above the floor. Unscored context is excluded by design.
 COMPONENT_WEIGHTS: dict[str, int] = {
-    "skill_coverage": 250,
+    "skill_coverage": 200,
     "audit_integrity": 150,
-    "salary_alignment": 150,
+    "seniority_fit": 100,
+    "salary_alignment": 100,
 }
 
 
 class ScoreComponent(StrictModel):
     """One weighted input. Unknown evidence awards nothing and lowers the ceiling."""
 
-    name: Literal["skill_coverage", "audit_integrity", "salary_alignment"]
+    name: Literal["skill_coverage", "audit_integrity", "seniority_fit", "salary_alignment"]
     evidence_status: Literal["supported", "unknown"]
     awarded: int = Field(ge=0)
     available: int = Field(ge=0)

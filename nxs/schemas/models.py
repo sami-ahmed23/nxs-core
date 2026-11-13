@@ -15,6 +15,7 @@ class JobListing(BaseModel):
     role: str
     salary: str | None = None
     tech_stack: list[str]
+    seniority: str | None = None  # extracted ladder level, None when the listing is silent
     url: str
     raw_html: str
 
@@ -28,6 +29,7 @@ class CandidateProfile(BaseModel):
 
     skills: list[str]
     experience_level: str
+    seniority_target: list[str]  # acceptable ladder levels, most junior first
     target_salary: str
     geo_preferences: list[str]
 
