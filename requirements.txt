@@ -11,3 +11,7 @@ supabase==2.32.0
 
 # Environment
 python-dotenv==1.2.4
+
+# Testing
+pytest==9.2.0
+markdown-it-py==4.3.0

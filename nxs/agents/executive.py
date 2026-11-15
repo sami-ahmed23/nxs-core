@@ -17,6 +17,22 @@ _LABELS = {
 }
 
 
+def headline_for(verdict: str, out_of_reach: bool, ceiling: int) -> str:
+    """One sentence stating what the verdict means for this listing. Shared with Editorial."""
+    if out_of_reach:
+        return ("Not worth pursuing. The listing is pitched beyond the stated seniority "
+                "target, and skill overlap does not offset that.")
+    if verdict == "Observe" and ceiling < DISCARD_BELOW:
+        # Distinguish a thin capture from a judged rejection.
+        return ("Monitor rather than act. The capture was too thin to reject on, "
+                f"so the listing could not score above {ceiling}.")
+    return {
+        "Proceed": "Worth applying to.",
+        "Observe": "Monitor rather than act.",
+        "Discard": "Not worth pursuing.",
+    }[verdict]
+
+
 def run_executive(state: PlacementState) -> ExecutiveReport:
     """Weigh the Assessor's components, the audit findings and the market evidence."""
     assessment = state.get("assessment_report")
@@ -61,18 +77,7 @@ def run_executive(state: PlacementState) -> ExecutiveReport:
     verdict = verdict_for(score, ceiling, out_of_reach)
     grade = grade_for(score)
 
-    headline = {
-        "Proceed": "Worth applying to.",
-        "Observe": "Monitor rather than act.",
-        "Discard": "Not worth pursuing.",
-    }[verdict]
-    if out_of_reach:
-        headline = ("Not worth pursuing. The listing is pitched beyond the stated seniority "
-                    "target, and skill overlap does not offset that.")
-    elif verdict == "Observe" and ceiling < DISCARD_BELOW:
-        # Distinguish a thin capture from a judged rejection.
-        headline = ("Monitor rather than act. The capture was too thin to reject on, "
-                    f"so the listing could not score above {ceiling}.")
+    headline = headline_for(verdict, out_of_reach, ceiling)
 
     reasoning = (
         f"{state['job_listing'].role} at {state['job_listing'].company}. "
